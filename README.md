@@ -11,11 +11,33 @@ A tiny JIT compiler in C++. It reads Brainfuck, generates x86-64 machine code at
 
 ## Optimizer
 
-Run folding, pointer-offset folding, clear loops (`[-]`) and multiply loops (`[->++<]`) are rewritten before code generation.
+Before code generation the Brainfuck is turned into a small IR and rewritten:
+
+- run folding: `+++++` becomes one add
+- pointer-offset folding: `>+<` touches `[rbx+1]` directly instead of moving the pointer
+- clear loops: `[-]` becomes a single store
+- multiply loops: `[->++>+++<<]` becomes multiply-adds with no looping
+
+On the Mandelbrot program, 11,451 Brainfuck ops become 2,221 IR ops.
+
+## Benchmark
+
+Erik Bosman's `mandelbrot.b`, single run, wall clock, Ubuntu 24.04, g++ 13.3 `-O2`, 4 threads. All three modes produce identical output (see `mandelbrot_output.txt`).
+
+| Mode | Time | Speedup vs interp |
+|---|---|---|
+| interp | 28,585 ms | 1.0x |
+| jit | 1,517 ms | 18.8x |
+| jitopt | 953 ms | 30.0x |
+
+Caveats: the interpreter is a deliberately plain baseline with no run folding, so part of the JIT gap is that, not only native code. The optimizer adds about 1.6x over the naive JIT on this program, because most of Mandelbrot's loops are not simple patterns.
+
+`mandelbrot.bf` is by Erik Bosman and is not my work.
 
 ## Build and run
 
     g++ -std=c++17 -O2 -Wall -o ritual ritual.cpp
     ./ritual jitopt hello.bf
+    ./ritual jitopt mandelbrot.bf
 
 Linux x86-64 only.
